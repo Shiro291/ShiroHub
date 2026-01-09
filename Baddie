@@ -1,4 +1,4 @@
--- [[ SHIRO HUB MAX ]] --
+-- [[ SHIRO HUB MOBILE ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,342 +6,154 @@ local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-
 local LocalPlayer = Players.LocalPlayer
 
--- // CONFIGURATION //
+-- // SETTINGS //
 local Config = {
-    AutoRoll = false,
-    AutoSell = false,
-    AutoPlaceBest = false,
-    AutoInfEgg = false,
-    AutoDiamondDice = false,
-    NoRender = false,
-    
-    -- Threads
-    RollThreads = 5,
-    DiamondThreads = 8,
-    
-    -- Exploit Settings
-    ItemName = "Basic Dice", 
-    ItemType = "dice",
-    ItemPrice = 300,
-    
-    -- Egg Settings
-    EggName = "MartianEgg",
-    EggAmount = 100
+    AutoRoll = false, AutoSell = false, AutoPlaceBest = false,
+    AutoInfEgg = false, AutoDiamondDice = false, NoRender = false,
+    ItemName = "Basic Dice", ItemType = "dice", ItemPrice = 300,
+    EggName = "MartianEgg", EggAmount = 100
 }
 
--- Sync Variable
-local LastPlaceTime = 0
-
--- // HELPERS //
-local function CleanNumber(n) return n:gsub("[^0-9.]", "") end
-
-local function FormatCommas(n)
-    local left, num, right = string.match(n, '^([^%d]*%d)(%d*)(.-)$')
-    return left .. (num:reverse():gsub('(%d%d%d)', '%1,'):reverse()) .. right
-end
-
--- // UI THEME //
 local Theme = {
-    Background = Color3.fromRGB(12, 12, 18),
-    Card = Color3.fromRGB(22, 22, 30),
-    AccentStart = Color3.fromRGB(255, 46, 126), -- Shiro Pink/Red
-    AccentEnd = Color3.fromRGB(255, 100, 180),
-    Text = Color3.fromRGB(245, 245, 255),
-    TextDim = Color3.fromRGB(160, 160, 175),
+    Background = Color3.fromRGB(15, 15, 20),
+    Accent = Color3.fromRGB(255, 46, 126),
+    Text = Color3.fromRGB(255, 255, 255)
 }
 
-local function Tween(obj, props, info)
-    local t = TweenService:Create(obj, info or TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
-    t:Play()
-    return t
-end
+-- // CLEAN PREVIOUS //
+if CoreGui:FindFirstChild("ShiroMobile") then CoreGui.ShiroMobile:Destroy() end
 
--- // ANTI-AFK //
-local VirtualUser = game:GetService("VirtualUser")
-LocalPlayer.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new())
-end)
+local sg = Instance.new("ScreenGui", CoreGui); sg.Name = "ShiroMobile"
 
--- // UI CONSTRUCTION //
-if CoreGui:FindFirstChild("ShiroHubMax") then CoreGui.ShiroHubMax:Destroy() end
-local ScreenGui = Instance.new("ScreenGui", CoreGui)
-ScreenGui.Name = "ShiroHubMax"
-ScreenGui.IgnoreGuiInset = true
+-- // FLOATING TOGGLE BUTTON //
+local MainToggle = Instance.new("TextButton", sg)
+MainToggle.Size = UDim2.fromOffset(55, 55)
+MainToggle.Position = UDim2.new(0.05, 0, 0.4, 0)
+MainToggle.BackgroundColor3 = Theme.Background
+MainToggle.Text = "SH"
+MainToggle.TextColor3 = Theme.Accent
+MainToggle.Font = "GothamBlack"
+MainToggle.TextSize = 22
+Instance.new("UICorner", MainToggle).CornerRadius = UDim.new(1, 0)
+local stroke = Instance.new("UIStroke", MainToggle); stroke.Color = Theme.Accent; stroke.Thickness = 2
 
--- 1. NO RENDER OVERLAY
-local NoRenderFrame = Instance.new("Frame", ScreenGui)
-NoRenderFrame.Size = UDim2.fromScale(1, 1)
-NoRenderFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-NoRenderFrame.Visible = false
-NoRenderFrame.ZIndex = 999
-
-local NoRenderLabel = Instance.new("TextLabel", NoRenderFrame)
-NoRenderLabel.Size = UDim2.fromScale(1, 1)
-NoRenderLabel.BackgroundTransparency = 1
-NoRenderLabel.Text = "SHIRO HUB: NO RENDER ACTIVE\n(Saving Resources...)"
-NoRenderLabel.TextColor3 = Theme.AccentEnd
-NoRenderLabel.Font = "GothamBold"
-NoRenderLabel.TextSize = 20
-
--- 2. FLOATING WIDGET
-local MiniWidget = Instance.new("TextButton", ScreenGui)
-MiniWidget.Size = UDim2.fromOffset(50, 50)
-MiniWidget.Position = UDim2.new(0.1, 0, 0.1, 0)
-MiniWidget.BackgroundColor3 = Theme.Background
-MiniWidget.Text = "SH"
-MiniWidget.TextColor3 = Theme.AccentStart
-MiniWidget.Font = "GothamBlack"
-MiniWidget.TextSize = 20
-MiniWidget.Visible = false
-Instance.new("UICorner", MiniWidget).CornerRadius = UDim.new(0, 10)
-local MiniStroke = Instance.new("UIStroke", MiniWidget)
-MiniStroke.Color = Theme.AccentStart
-MiniStroke.Thickness = 2
-
--- 3. MAIN WINDOW
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.fromOffset(550, 350)
+-- // MAIN PANEL //
+local Main = Instance.new("Frame", sg)
+Main.Size = UDim2.new(0, 300, 0, 400)
 Main.Position = UDim2.fromScale(0.5, 0.5)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.BackgroundColor3 = Theme.Background
-Main.ClipsDescendants = true
+Main.Visible = false
+Instance.new("UICorner", Main)
 
-local MainCorner = Instance.new("UICorner", Main)
-MainCorner.CornerRadius = UDim.new(0, 10)
-Instance.new("UIStroke", Main).Color = Color3.fromRGB(50, 50, 60)
+local title = Instance.new("TextLabel", Main)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "SHIRO HUB MOBILE"
+title.TextColor3 = Theme.Accent
+title.Font = "GothamBlack"
+title.TextSize = 16
+title.BackgroundTransparency = 1
 
--- Sidebar
-local Sidebar = Instance.new("Frame", Main)
-Sidebar.Size = UDim2.new(0, 140, 1, 0)
-Sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+local scroll = Instance.new("ScrollingFrame", Main)
+scroll.Size = UDim2.new(1, -20, 1, -50); scroll.Position = UDim2.new(0, 10, 0, 45)
+scroll.BackgroundTransparency = 1; scroll.ScrollBarThickness = 2
+local layout = Instance.new("UIListLayout", scroll); layout.Padding = UDim.new(0, 10)
 
-local Brand = Instance.new("TextLabel", Sidebar)
-Brand.Size = UDim2.new(1, 0, 0, 60)
-Brand.BackgroundTransparency = 1
-Brand.Text = "SHIRO<font color=\"rgb(255,46,126)\">HUB</font>"
-Brand.RichText = true
-Brand.Font = "GothamBlack"
-Brand.TextSize = 22
-Brand.TextColor3 = Theme.Text
+-- // MOBILE TOGGLE MAKER //
+local function CreateToggle(name, key, callback)
+    local btn = Instance.new("TextButton", scroll)
+    btn.Size = UDim2.new(1, 0, 0, 50)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    btn.Text = name .. ": OFF"
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = "GothamBold"
+    btn.TextSize = 14
+    Instance.new("UICorner", btn)
 
--- Content Area
-local Content = Instance.new("Frame", Main)
-Content.Size = UDim2.new(1, -140, 1, 0)
-Content.Position = UDim2.new(0, 140, 0, 0)
-Content.BackgroundTransparency = 1
-
-local PageContainer = Instance.new("Frame", Content)
-PageContainer.Size = UDim2.new(1, -20, 1, -20)
-PageContainer.Position = UDim2.new(0, 10, 0, 10)
-PageContainer.BackgroundTransparency = 1
-
-local Pages = {}
-local function CreatePage(Name)
-    local P = Instance.new("ScrollingFrame", PageContainer)
-    P.Size = UDim2.fromScale(1,1)
-    P.BackgroundTransparency = 1
-    P.ScrollBarThickness = 0
-    P.Visible = false
-    
-    local Layout = Instance.new("UIListLayout", P)
-    Layout.Padding = UDim.new(0, 8)
-    Pages[Name] = P
-    return P
-end
-
-local PageHome = CreatePage("Home")
-local PageAuto = CreatePage("Automation")
-
--- // UI COMPONENTS //
-
-local function CreateCard(Page, TitleText)
-    local Card = Instance.new("Frame", Page)
-    Card.Size = UDim2.new(0.98, 0, 0, 65)
-    Card.BackgroundColor3 = Theme.Card
-    Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
-    
-    local Title = Instance.new("TextLabel", Card)
-    Title.Position = UDim2.new(0, 15, 0, 0)
-    Title.Size = UDim2.new(0.6, 0, 1, 0)
-    Title.BackgroundTransparency = 1
-    Title.Text = TitleText
-    Title.Font = "GothamBold"
-    Title.TextColor3 = Theme.Text
-    Title.TextSize = 14
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    
-    return Card
-end
-
-local function CreateToggle(Card, ConfigKey, Callback)
-    local Button = Instance.new("TextButton", Card)
-    Button.Size = UDim2.new(0, 80, 0, 30)
-    Button.Position = UDim2.new(1, -95, 0.5, -15)
-    Button.BackgroundColor3 = Theme.Background
-    Button.Text = "OFF"
-    Button.Font = "GothamBold"
-    Button.TextColor3 = Theme.TextDim
-    Button.TextSize = 10
-    Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 6)
-
-    Button.MouseButton1Click:Connect(function()
-        Config[ConfigKey] = not Config[ConfigKey]
-        if Config[ConfigKey] then
-            Tween(Button, {BackgroundColor3 = Theme.AccentStart, TextColor3 = Theme.Text})
-            Button.Text = "ON"
-        else
-            Tween(Button, {BackgroundColor3 = Theme.Background, TextColor3 = Theme.TextDim})
-            Button.Text = "OFF"
-        end
-        if Callback then Callback(Config[ConfigKey]) end
+    btn.MouseButton1Click:Connect(function()
+        Config[key] = not Config[key]
+        btn.Text = name .. (Config[key] and ": ON" or ": OFF")
+        btn.BackgroundColor3 = Config[key] and Theme.Accent or Color3.fromRGB(30, 30, 40)
+        if callback then callback(Config[key]) end
     end)
 end
 
--- // TABS //
-local TabContainer = Instance.new("Frame", Sidebar)
-TabContainer.Size = UDim2.new(1, 0, 0.6, 0)
-TabContainer.Position = UDim2.new(0, 0, 0.2, 0)
-TabContainer.BackgroundTransparency = 1
-Instance.new("UIListLayout", TabContainer).Padding = UDim.new(0, 5)
+-- // FEATURES //
 
-local function CreateTab(Name, TargetPage)
-    local Btn = Instance.new("TextButton", TabContainer)
-    Btn.Size = UDim2.new(1, 0, 0, 40)
-    Btn.BackgroundTransparency = 1
-    Btn.Text = Name
-    Btn.Font = "GothamBold"
-    Btn.TextColor3 = Theme.TextDim
-    Btn.TextSize = 12
+-- 1. NO RENDER
+local Blackout = Instance.new("Frame", sg)
+Blackout.Size = UDim2.fromScale(1,1); Blackout.BackgroundColor3 = Color3.new(0,0,0); Blackout.Visible = false; Blackout.ZIndex = 999
 
-    Btn.MouseButton1Click:Connect(function()
-        for _, p in pairs(Pages) do p.Visible = false end
-        TargetPage.Visible = true
-        for _, b in pairs(TabContainer:GetChildren()) do 
-            if b:IsA("TextButton") then b.TextColor3 = Theme.TextDim end 
+CreateToggle("NO RENDER", "NoRender", function(val)
+    Blackout.Visible = val
+    RunService:Set3dRenderingEnabled(not val)
+end)
+
+-- 2. QUICK MONEY
+local moneyFrame = Instance.new("Frame", scroll)
+moneyFrame.Size = UDim2.new(1, 0, 0, 60); moneyFrame.BackgroundTransparency = 1
+
+local input = Instance.new("TextBox", moneyFrame)
+input.Size = UDim2.new(0.7, 0, 1, 0); input.PlaceholderText = "Enter Money Amount"; input.BackgroundColor3 = Color3.fromRGB(30, 30, 40); input.TextColor3 = Theme.Text; Instance.new("UICorner", input)
+
+local add = Instance.new("TextButton", moneyFrame)
+add.Size = UDim2.new(0.25, 0, 1, 0); add.Position = UDim2.new(0.75, 0, 0, 0); add.Text = "+"; add.BackgroundColor3 = Theme.Accent; add.TextColor3 = Theme.Text; Instance.new("UICorner", add)
+
+add.MouseButton1Click:Connect(function()
+    local val = tonumber(input.Text:gsub("%D+", ""))
+    if val then
+        ReplicatedStorage.Events.buy:InvokeServer(Config.ItemName, -(val / Config.ItemPrice), Config.ItemType)
+    end
+end)
+
+-- 3. AUTO FEATURES
+CreateToggle("AUTO ROLL", "AutoRoll", function(state)
+    task.spawn(function()
+        while Config.AutoRoll do
+            pcall(function() LocalPlayer.PlayerGui.Main.Dice.RollState:InvokeServer() end)
+            task.wait()
         end
-        Btn.TextColor3 = Theme.AccentStart
     end)
-end
-
-CreateTab("OVERVIEW", PageHome)
-CreateTab("AUTOMATION", PageAuto)
-
--- Special No Render Tab Button
-local NRBtn = Instance.new("TextButton", TabContainer)
-NRBtn.Size = UDim2.new(1, 0, 0, 40)
-NRBtn.BackgroundTransparency = 1
-NRBtn.Text = "NO RENDER"
-NRBtn.Font = "GothamBold"
-NRBtn.TextColor3 = Color3.fromRGB(100, 100, 120)
-NRBtn.TextSize = 12
-
-NRBtn.MouseButton1Click:Connect(function()
-    Config.NoRender = not Config.NoRender
-    NoRenderFrame.Visible = Config.NoRender
-    RunService:Set3dRenderingEnabled(not Config.NoRender)
-    NRBtn.TextColor3 = Config.NoRender and Theme.AccentEnd or Color3.fromRGB(100, 100, 120)
 end)
 
--- // CONTENT //
-local MoneyCard = CreateCard(PageHome, "Quick Money Inject")
-local MInput = Instance.new("TextBox", MoneyCard)
-MInput.Size = UDim2.new(0.4, 0, 0, 30); MInput.Position = UDim2.new(0.45, 0, 0.5, -15)
-MInput.BackgroundColor3 = Theme.Background; MInput.TextColor3 = Theme.Text; MInput.PlaceholderText = "Amount"
-Instance.new("UICorner", MInput)
-
-local MExec = Instance.new("TextButton", MoneyCard)
-MExec.Size = UDim2.new(0, 30, 0, 30); MExec.Position = UDim2.new(1, -40, 0.5, -15)
-MExec.BackgroundColor3 = Theme.AccentStart; MExec.Text = ">"; MExec.TextColor3 = Theme.Text
-Instance.new("UICorner", MExec)
-
-MExec.MouseButton1Click:Connect(function()
-    local amt = tonumber(CleanNumber(MInput.Text))
-    if amt then
-        ReplicatedStorage.Events.buy:InvokeServer(Config.ItemName, -(amt / Config.ItemPrice), Config.ItemType)
-    end
-end)
-
-CreateToggle(CreateCard(PageHome, "Auto Diamond Dice"), "AutoDiamondDice", function(state)
-    if state then
-        for i = 1, Config.DiamondThreads do
-            task.spawn(function()
-                while Config.AutoDiamondDice do
-                    pcall(function() ReplicatedStorage.Events.DontLeave:InvokeServer() end)
-                    task.wait()
-                end
-            end)
+CreateToggle("DIAMOND DICE", "AutoDiamondDice", function(state)
+    task.spawn(function()
+        while Config.AutoDiamondDice do
+            pcall(function() ReplicatedStorage.Events.DontLeave:InvokeServer() end)
+            task.wait()
         end
-    end
+    end)
 end)
 
-CreateToggle(CreateCard(PageAuto, "Loop Buy Best Egg"), "AutoInfEgg")
-CreateToggle(CreateCard(PageAuto, "Super Fast Roll"), "AutoRoll", function(state)
-    if state then
-        for i = 1, Config.RollThreads do
-            task.spawn(function()
-                while Config.AutoRoll do
-                    pcall(function() LocalPlayer.PlayerGui.Main.Dice.RollState:InvokeServer() end)
-                    task.wait()
-                end
-            end)
-        end
-    end
-end)
-CreateToggle(CreateCard(PageAuto, "Auto Place Best"), "AutoPlaceBest")
-CreateToggle(CreateCard(PageAuto, "Auto Sell All"), "AutoSell")
+CreateToggle("LOOP BUY BEST EGG", "AutoInfEgg")
+CreateToggle("AUTO PLACE BEST", "AutoPlaceBest")
+CreateToggle("AUTO SELL", "AutoSell")
 
--- // LOGIC LOOPS //
-
+-- // LOOPS //
 task.spawn(function()
-    while true do
-        if Config.AutoPlaceBest then
-            pcall(function() ReplicatedStorage.Events.PlaceBestBaddies:InvokeServer() end)
-            LastPlaceTime = tick()
-        end
-        task.wait(2)
-    end
-end)
-
-task.spawn(function()
-    while true do
-        if Config.AutoSell then
-            if not Config.AutoPlaceBest or (tick() - LastPlaceTime > 2.5) then
-                pcall(function() ReplicatedStorage.Events.sell:InvokeServer("all") end)
-            end
-        end
-        task.wait(5)
-    end
-end)
-
-task.spawn(function()
-    while true do
+    while task.wait(2) do
+        if Config.AutoPlaceBest then pcall(function() ReplicatedStorage.Events.PlaceBestBaddies:InvokeServer() end) end
+        if Config.AutoSell then pcall(function() ReplicatedStorage.Events.sell:InvokeServer("all") end) end
         if Config.AutoInfEgg then
-            ReplicatedStorage.Events.buy:InvokeServer(Config.ItemName, -(1e14 / Config.ItemPrice), Config.ItemType)
+            ReplicatedStorage.Events.buy:InvokeServer(Config.ItemName, -(1e14/300), Config.ItemType)
             pcall(function() ReplicatedStorage.Events.RegularPet:InvokeServer(Config.EggName, Config.EggAmount) end)
-            task.wait(0.1)
-        else task.wait(1) end
+        end
     end
 end)
 
--- Minimize Logic
-local MinBtn = Instance.new("TextButton", Main)
-MinBtn.Size = UDim2.fromOffset(30, 30); MinBtn.Position = UDim2.new(1, -35, 0, 5)
-MinBtn.BackgroundTransparency = 1; MinBtn.Text = "_"; MinBtn.TextColor3 = Theme.TextDim; MinBtn.TextSize = 20
+-- // UTILS //
+MainToggle.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
 
-MinBtn.MouseButton1Click:Connect(function() Main.Visible = false; MiniWidget.Visible = true end)
-MiniWidget.MouseButton1Click:Connect(function() MiniWidget.Visible = false; Main.Visible = true end)
+-- Anti AFK
+LocalPlayer.Idled:Connect(function()
+    game:GetService("VirtualUser"):CaptureController()
+    game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+end)
 
--- Initial State
-PageHome.Visible = true
-Main.Position = UDim2.new(0.5, 0, 1.5, 0)
-Tween(Main, {Position = UDim2.fromScale(0.5, 0.5)})
-
--- Draggable Main
-local d, i, s, p
-Main.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then d = true; s = input.Position; p = Main.Position end end)
-Main.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then d = false end end)
-UserInputService.InputChanged:Connect(function(input) if d and input.UserInputType == Enum.UserInputType.MouseMovement then local delta = input.Position - s; Main.Position = UDim2.new(p.X.Scale, p.X.Offset + delta.X, p.Y.Scale, p.Y.Offset + delta.Y) end end)
+-- Draggable Mobile Fix
+local d, s, p
+MainToggle.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch then d = true; s = i.Position; p = MainToggle.Position end end)
+UserInputService.InputChanged:Connect(function(i) if d and i.UserInputType == Enum.UserInputType.Touch then local delta = i.Position - s; MainToggle.Position = UDim2.new(p.X.Scale, p.X.Offset + delta.X, p.Y.Scale, p.Y.Offset + delta.Y) end end)
+MainToggle.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch then d = false end end)
