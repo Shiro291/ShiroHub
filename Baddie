@@ -1,4 +1,4 @@
--- [[ BREV HUB ]] --
+-- [[ SHIRO HUB MAX ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,10 +16,11 @@ local Config = {
     AutoPlaceBest = false,
     AutoInfEgg = false,
     AutoDiamondDice = false,
+    NoRender = false,
     
     -- Threads
     RollThreads = 5,
-    DiamondThreads = 10,
+    DiamondThreads = 8,
     
     -- Exploit Settings
     ItemName = "Basic Dice", 
@@ -42,25 +43,14 @@ local function FormatCommas(n)
     return left .. (num:reverse():gsub('(%d%d%d)', '%1,'):reverse()) .. right
 end
 
-local function FormatCompact(n)
-    if n >= 1e18 then return string.format("%.2fQt", n/1e18) end
-    if n >= 1e15 then return string.format("%.2fQd", n/1e15) end
-    if n >= 1e12 then return string.format("%.2fT", n/1e12) end
-    if n >= 1e9 then return string.format("%.2fB", n/1e9) end
-    if n >= 1e6 then return string.format("%.2fM", n/1e6) end
-    if n >= 1e3 then return string.format("%.2fK", n/1e3) end
-    return tostring(n)
-end
-
--- // UI THEME & ANIMATION ENGINE //
+-- // UI THEME //
 local Theme = {
-    Background = Color3.fromRGB(10, 10, 15),
-    Card = Color3.fromRGB(20, 20, 28),
-    AccentStart = Color3.fromRGB(60, 20, 180), -- Deep Purple
-    AccentEnd = Color3.fromRGB(120, 60, 220), -- Lighter Purple
-    Text = Color3.fromRGB(240, 240, 255),
-    TextDim = Color3.fromRGB(150, 150, 160),
-    Success = Color3.fromRGB(46, 204, 113)
+    Background = Color3.fromRGB(12, 12, 18),
+    Card = Color3.fromRGB(22, 22, 30),
+    AccentStart = Color3.fromRGB(255, 46, 126), -- Shiro Pink/Red
+    AccentEnd = Color3.fromRGB(255, 100, 180),
+    Text = Color3.fromRGB(245, 245, 255),
+    TextDim = Color3.fromRGB(160, 160, 175),
 }
 
 local function Tween(obj, props, info)
@@ -69,144 +59,73 @@ local function Tween(obj, props, info)
     return t
 end
 
+-- // ANTI-AFK //
+local VirtualUser = game:GetService("VirtualUser")
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
 -- // UI CONSTRUCTION //
-if CoreGui:FindFirstChild("BrevHubMax") then CoreGui.BrevHubMax:Destroy() end
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BrevHubMax"
-ScreenGui.Parent = CoreGui
+if CoreGui:FindFirstChild("ShiroHubMax") then CoreGui.ShiroHubMax:Destroy() end
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "ShiroHubMax"
 ScreenGui.IgnoreGuiInset = true
 
--- 1. FLOATING MINIMIZED WIDGET
+-- 1. NO RENDER OVERLAY
+local NoRenderFrame = Instance.new("Frame", ScreenGui)
+NoRenderFrame.Size = UDim2.fromScale(1, 1)
+NoRenderFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+NoRenderFrame.Visible = false
+NoRenderFrame.ZIndex = 999
+
+local NoRenderLabel = Instance.new("TextLabel", NoRenderFrame)
+NoRenderLabel.Size = UDim2.fromScale(1, 1)
+NoRenderLabel.BackgroundTransparency = 1
+NoRenderLabel.Text = "SHIRO HUB: NO RENDER ACTIVE\n(Saving Resources...)"
+NoRenderLabel.TextColor3 = Theme.AccentEnd
+NoRenderLabel.Font = "GothamBold"
+NoRenderLabel.TextSize = 20
+
+-- 2. FLOATING WIDGET
 local MiniWidget = Instance.new("TextButton", ScreenGui)
-MiniWidget.Name = "MiniWidget"
 MiniWidget.Size = UDim2.fromOffset(50, 50)
 MiniWidget.Position = UDim2.new(0.1, 0, 0.1, 0)
 MiniWidget.BackgroundColor3 = Theme.Background
-MiniWidget.Text = "BH"
-MiniWidget.TextColor3 = Theme.AccentEnd
-MiniWidget.Font = Enum.Font.GothamBlack
-MiniWidget.TextSize = 18
-MiniWidget.Visible = false -- Hidden by default
-Instance.new("UICorner", MiniWidget).CornerRadius = UDim.new(0, 12)
+MiniWidget.Text = "SH"
+MiniWidget.TextColor3 = Theme.AccentStart
+MiniWidget.Font = "GothamBlack"
+MiniWidget.TextSize = 20
+MiniWidget.Visible = false
+Instance.new("UICorner", MiniWidget).CornerRadius = UDim.new(0, 10)
 local MiniStroke = Instance.new("UIStroke", MiniWidget)
 MiniStroke.Color = Theme.AccentStart
 MiniStroke.Thickness = 2
 
--- Dragging for MiniWidget
-local MiniDrag, MiniStart, MiniPos
-MiniWidget.InputBegan:Connect(function(input) 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then 
-        MiniDrag = true; MiniStart = input.Position; MiniPos = MiniWidget.Position 
-    end 
-end)
-MiniWidget.InputEnded:Connect(function(input) 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then MiniDrag = false end 
-end)
-UserInputService.InputChanged:Connect(function(input) 
-    if MiniDrag and input.UserInputType == Enum.UserInputType.MouseMovement then 
-        local Delta = input.Position - MiniStart
-        MiniWidget.Position = UDim2.new(MiniPos.X.Scale, MiniPos.X.Offset + Delta.X, MiniPos.Y.Scale, MiniPos.Y.Offset + Delta.Y) 
-    end 
-end)
-
--- 2. LOADING SCREEN
-local LoadingBackdrop = Instance.new("Frame", ScreenGui)
-LoadingBackdrop.BackgroundColor3 = Color3.fromRGB(0,0,0)
-LoadingBackdrop.BackgroundTransparency = 0.3
-LoadingBackdrop.Size = UDim2.fromScale(1,1)
-LoadingBackdrop.ZIndex = 100
-
-local LoaderFrame = Instance.new("Frame", LoadingBackdrop)
-LoaderFrame.Size = UDim2.fromOffset(250, 150)
-LoaderFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-LoaderFrame.Position = UDim2.fromScale(0.5, 0.5)
-LoaderFrame.BackgroundColor3 = Theme.Background
-Instance.new("UICorner", LoaderFrame).CornerRadius = UDim.new(0, 12)
-Instance.new("UIStroke", LoaderFrame).Color = Theme.Card
-
-local LoaderGradient = Instance.new("UIGradient", LoaderFrame)
-LoaderGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Theme.Background),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 12, 25))
-}
-LoaderGradient.Rotation = 45
-
-local LogoText = Instance.new("TextLabel", LoaderFrame)
-LogoText.Size = UDim2.new(1,0,0.6,0)
-LogoText.BackgroundTransparency = 1
-LogoText.Text = "BREV HUB"
-LogoText.TextColor3 = Theme.Text
-LogoText.Font = Enum.Font.GothamBlack
-LogoText.TextSize = 24
-
-local LoadingBarBG = Instance.new("Frame", LoaderFrame)
-LoadingBarBG.Size = UDim2.new(0.7, 0, 0.04, 0)
-LoadingBarBG.Position = UDim2.new(0.15, 0, 0.7, 0)
-LoadingBarBG.BackgroundColor3 = Theme.Card
-Instance.new("UICorner", LoadingBarBG).CornerRadius = UDim.new(1, 0)
-
-local LoadingBarFill = Instance.new("Frame", LoadingBarBG)
-LoadingBarFill.Size = UDim2.new(0, 0, 1, 0)
-LoadingBarFill.BackgroundColor3 = Theme.AccentEnd
-Instance.new("UICorner", LoadingBarFill).CornerRadius = UDim.new(1, 0)
-
--- Animate Loading
-Tween(LoaderFrame, {Size = UDim2.fromOffset(260, 160)}, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true))
-Tween(LoadingBarFill, {Size = UDim2.new(1, 0, 1, 0)}, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut))
-
--- 3. MAIN INTERFACE
+-- 3. MAIN WINDOW
 local Main = Instance.new("Frame", ScreenGui)
-Main.Name = "Main"
 Main.Size = UDim2.fromOffset(550, 350)
 Main.Position = UDim2.fromScale(0.5, 0.5)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.BackgroundColor3 = Theme.Background
 Main.ClipsDescendants = true
-Main.Visible = false -- Hidden until loaded
 
 local MainCorner = Instance.new("UICorner", Main)
-MainCorner.CornerRadius = UDim.new(0, 12)
-
-local MainStroke = Instance.new("UIStroke", Main)
-MainStroke.Color = Color3.fromRGB(40, 35, 50)
-MainStroke.Thickness = 1.5
-
--- Dragging Main
-local Dragging, DragInput, DragStart, StartPos
-Main.InputBegan:Connect(function(input) 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then 
-        Dragging = true; DragStart = input.Position; StartPos = Main.Position 
-    end 
-end)
-Main.InputEnded:Connect(function(input) 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then Dragging = false end 
-end)
-UserInputService.InputChanged:Connect(function(input) 
-    if Dragging and input.UserInputType == Enum.UserInputType.MouseMovement then 
-        local Delta = input.Position - DragStart
-        Main.Position = UDim2.new(StartPos.X.Scale, StartPos.X.Offset + Delta.X, StartPos.Y.Scale, StartPos.Y.Offset + Delta.Y) 
-    end 
-end)
+MainCorner.CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", Main).Color = Color3.fromRGB(50, 50, 60)
 
 -- Sidebar
 local Sidebar = Instance.new("Frame", Main)
 Sidebar.Size = UDim2.new(0, 140, 1, 0)
-Sidebar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Sidebar.BorderSizePixel = 0
-Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 12)
-local SidebarCover = Instance.new("Frame", Sidebar) -- Hides right corners
-SidebarCover.Size = UDim2.new(0.2,0,1,0)
-SidebarCover.Position = UDim2.new(0.8,0,0,0)
-SidebarCover.BorderSizePixel = 0
-SidebarCover.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+Sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
 
 local Brand = Instance.new("TextLabel", Sidebar)
 Brand.Size = UDim2.new(1, 0, 0, 60)
 Brand.BackgroundTransparency = 1
-Brand.Text = "BREV<font color=\"rgb(120,60,220)\">MAX</font>"
+Brand.Text = "SHIRO<font color=\"rgb(255,46,126)\">HUB</font>"
 Brand.RichText = true
-Brand.Font = Enum.Font.GothamBlack
-Brand.TextSize = 20
+Brand.Font = "GothamBlack"
+Brand.TextSize = 22
 Brand.TextColor3 = Theme.Text
 
 -- Content Area
@@ -215,51 +134,21 @@ Content.Size = UDim2.new(1, -140, 1, 0)
 Content.Position = UDim2.new(0, 140, 0, 0)
 Content.BackgroundTransparency = 1
 
--- MINIMIZE BUTTON
-local MinBtn = Instance.new("TextButton", Content)
-MinBtn.Size = UDim2.fromOffset(30, 30)
-MinBtn.Position = UDim2.new(1, -35, 0, 5)
-MinBtn.BackgroundTransparency = 1
-MinBtn.Text = "—"
-MinBtn.TextColor3 = Theme.TextDim
-MinBtn.Font = Enum.Font.GothamBold
-MinBtn.TextSize = 18
-
-MinBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false
-    MiniWidget.Visible = true
-end)
-
-MiniWidget.MouseButton1Click:Connect(function()
-    MiniWidget.Visible = false
-    Main.Visible = true
-end)
-
--- Pages Logic
 local PageContainer = Instance.new("Frame", Content)
 PageContainer.Size = UDim2.new(1, -20, 1, -20)
 PageContainer.Position = UDim2.new(0, 10, 0, 10)
 PageContainer.BackgroundTransparency = 1
 
 local Pages = {}
-
 local function CreatePage(Name)
     local P = Instance.new("ScrollingFrame", PageContainer)
     P.Size = UDim2.fromScale(1,1)
     P.BackgroundTransparency = 1
-    P.ScrollBarThickness = 2
-    P.ScrollBarImageColor3 = Theme.AccentEnd
+    P.ScrollBarThickness = 0
     P.Visible = false
-    P.Name = Name
     
     local Layout = Instance.new("UIListLayout", P)
-    Layout.Padding = UDim.new(0, 10)
-    Layout.SortOrder = Enum.SortOrder.LayoutOrder
-    
-    local Pad = Instance.new("UIPadding", P)
-    Pad.PaddingTop = UDim.new(0,5)
-    Pad.PaddingLeft = UDim.new(0,5)
-    
+    Layout.Padding = UDim.new(0, 8)
     Pages[Name] = P
     return P
 end
@@ -267,99 +156,23 @@ end
 local PageHome = CreatePage("Home")
 local PageAuto = CreatePage("Automation")
 
--- Tab System
-local TabContainer = Instance.new("Frame", Sidebar)
-TabContainer.Size = UDim2.new(1, 0, 0.8, 0)
-TabContainer.Position = UDim2.new(0, 0, 0.2, 0)
-TabContainer.BackgroundTransparency = 1
-
-local UIList = Instance.new("UIListLayout", TabContainer)
-UIList.SortOrder = Enum.SortOrder.LayoutOrder
-UIList.Padding = UDim.new(0, 5)
-
-local CurrentTab = nil
-
-local function CreateTab(Name, TargetPage)
-    local Btn = Instance.new("TextButton", TabContainer)
-    Btn.Size = UDim2.new(1, -20, 0, 35)
-    Btn.Position = UDim2.new(0, 10, 0, 0)
-    Btn.BackgroundColor3 = Theme.Background
-    Btn.BackgroundTransparency = 1 -- Start transparent
-    Btn.Text = "      " .. Name
-    Btn.Font = Enum.Font.GothamBold
-    Btn.TextColor3 = Theme.TextDim
-    Btn.TextSize = 12
-    Btn.TextXAlignment = Enum.TextXAlignment.Left
-    
-    local Indicator = Instance.new("Frame", Btn)
-    Indicator.Size = UDim2.new(0, 3, 0.6, 0)
-    Indicator.Position = UDim2.new(0, 0, 0.2, 0)
-    Indicator.BackgroundColor3 = Theme.AccentEnd
-    Indicator.BackgroundTransparency = 1
-    Instance.new("UICorner", Indicator).CornerRadius = UDim.new(1,0)
-
-    Btn.MouseButton1Click:Connect(function()
-        for _, p in pairs(Pages) do p.Visible = false end
-        TargetPage.Visible = true
-        
-        -- Reset all tabs
-        for _, child in pairs(TabContainer:GetChildren()) do
-            if child:IsA("TextButton") then
-                Tween(child, {TextColor3 = Theme.TextDim})
-                Tween(child.Frame, {BackgroundTransparency = 1})
-            end
-        end
-        
-        -- Active State
-        Tween(Btn, {TextColor3 = Theme.Text})
-        Tween(Indicator, {BackgroundTransparency = 0})
-    end)
-    
-    if CurrentTab == nil then
-        CurrentTab = Btn
-        TargetPage.Visible = true
-        Btn.TextColor3 = Theme.Text
-        Indicator.BackgroundTransparency = 0
-    end
-end
-
-CreateTab("Overview", PageHome)
-CreateTab("Automation", PageAuto)
-
 -- // UI COMPONENTS //
 
-local function CreateCard(Page, TitleText, DescText)
+local function CreateCard(Page, TitleText)
     local Card = Instance.new("Frame", Page)
-    Card.Size = UDim2.new(0.98, 0, 0, 70)
+    Card.Size = UDim2.new(0.98, 0, 0, 65)
     Card.BackgroundColor3 = Theme.Card
     Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
     
-    local Grad = Instance.new("UIGradient", Card)
-    Grad.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(30,30,40)),
-        ColorSequenceKeypoint.new(1, Theme.Card)
-    }
-    Grad.Rotation = 45
-    
     local Title = Instance.new("TextLabel", Card)
-    Title.Position = UDim2.new(0, 15, 0, 10)
-    Title.Size = UDim2.new(0.6, 0, 0, 20)
+    Title.Position = UDim2.new(0, 15, 0, 0)
+    Title.Size = UDim2.new(0.6, 0, 1, 0)
     Title.BackgroundTransparency = 1
     Title.Text = TitleText
-    Title.Font = Enum.Font.GothamBold
+    Title.Font = "GothamBold"
     Title.TextColor3 = Theme.Text
-    Title.TextSize = 13
+    Title.TextSize = 14
     Title.TextXAlignment = Enum.TextXAlignment.Left
-    
-    local Desc = Instance.new("TextLabel", Card)
-    Desc.Position = UDim2.new(0, 15, 0, 35)
-    Desc.Size = UDim2.new(0.6, 0, 0, 20)
-    Desc.BackgroundTransparency = 1
-    Desc.Text = DescText or ""
-    Desc.Font = Enum.Font.Gotham
-    Desc.TextColor3 = Theme.TextDim
-    Desc.TextSize = 11
-    Desc.TextXAlignment = Enum.TextXAlignment.Left
     
     return Card
 end
@@ -369,92 +182,90 @@ local function CreateToggle(Card, ConfigKey, Callback)
     Button.Size = UDim2.new(0, 80, 0, 30)
     Button.Position = UDim2.new(1, -95, 0.5, -15)
     Button.BackgroundColor3 = Theme.Background
-    Button.Text = "ENABLE"
-    Button.Font = Enum.Font.GothamBold
+    Button.Text = "OFF"
+    Button.Font = "GothamBold"
     Button.TextColor3 = Theme.TextDim
     Button.TextSize = 10
     Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 6)
-    Instance.new("UIStroke", Button).Color = Theme.Card
-    Instance.new("UIStroke", Button).Thickness = 1.5
 
     Button.MouseButton1Click:Connect(function()
         Config[ConfigKey] = not Config[ConfigKey]
-        
         if Config[ConfigKey] then
             Tween(Button, {BackgroundColor3 = Theme.AccentStart, TextColor3 = Theme.Text})
-            Button.Text = "ACTIVE"
-            -- Glow effect
-            local Glow = Instance.new("Frame", Button)
-            Glow.Name = "Glow"
-            Glow.Size = UDim2.fromScale(1,1)
-            Glow.BackgroundColor3 = Theme.AccentEnd
-            Glow.ZIndex = -1
-            Instance.new("UICorner", Glow).CornerRadius = UDim.new(0, 6)
-            local GGrad = Instance.new("UIGradient", Glow)
-            GGrad.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1)}
-            Tween(Glow, {Size = UDim2.new(1.1,0,1.2,0), Transparency = 0.8}, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1, true))
+            Button.Text = "ON"
         else
             Tween(Button, {BackgroundColor3 = Theme.Background, TextColor3 = Theme.TextDim})
-            Button.Text = "ENABLE"
-            if Button:FindFirstChild("Glow") then Button.Glow:Destroy() end
+            Button.Text = "OFF"
         end
-        
         if Callback then Callback(Config[ConfigKey]) end
     end)
 end
 
--- // PAGE CONTENT //
+-- // TABS //
+local TabContainer = Instance.new("Frame", Sidebar)
+TabContainer.Size = UDim2.new(1, 0, 0.6, 0)
+TabContainer.Position = UDim2.new(0, 0, 0.2, 0)
+TabContainer.BackgroundTransparency = 1
+Instance.new("UIListLayout", TabContainer).Padding = UDim.new(0, 5)
 
--- HOME PAGE: Money Giver
-local MoneyCard = CreateCard(PageHome, "Money Giver", "Inject currency directly into your balance.")
-MoneyCard.Size = UDim2.new(0.98, 0, 0, 100) -- Taller card
+local function CreateTab(Name, TargetPage)
+    local Btn = Instance.new("TextButton", TabContainer)
+    Btn.Size = UDim2.new(1, 0, 0, 40)
+    Btn.BackgroundTransparency = 1
+    Btn.Text = Name
+    Btn.Font = "GothamBold"
+    Btn.TextColor3 = Theme.TextDim
+    Btn.TextSize = 12
 
+    Btn.MouseButton1Click:Connect(function()
+        for _, p in pairs(Pages) do p.Visible = false end
+        TargetPage.Visible = true
+        for _, b in pairs(TabContainer:GetChildren()) do 
+            if b:IsA("TextButton") then b.TextColor3 = Theme.TextDim end 
+        end
+        Btn.TextColor3 = Theme.AccentStart
+    end)
+end
+
+CreateTab("OVERVIEW", PageHome)
+CreateTab("AUTOMATION", PageAuto)
+
+-- Special No Render Tab Button
+local NRBtn = Instance.new("TextButton", TabContainer)
+NRBtn.Size = UDim2.new(1, 0, 0, 40)
+NRBtn.BackgroundTransparency = 1
+NRBtn.Text = "NO RENDER"
+NRBtn.Font = "GothamBold"
+NRBtn.TextColor3 = Color3.fromRGB(100, 100, 120)
+NRBtn.TextSize = 12
+
+NRBtn.MouseButton1Click:Connect(function()
+    Config.NoRender = not Config.NoRender
+    NoRenderFrame.Visible = Config.NoRender
+    RunService:Set3dRenderingEnabled(not Config.NoRender)
+    NRBtn.TextColor3 = Config.NoRender and Theme.AccentEnd or Color3.fromRGB(100, 100, 120)
+end)
+
+-- // CONTENT //
+local MoneyCard = CreateCard(PageHome, "Quick Money Inject")
 local MInput = Instance.new("TextBox", MoneyCard)
-MInput.Size = UDim2.new(0.9, 0, 0, 35)
-MInput.Position = UDim2.new(0.05, 0, 0, 50)
-MInput.BackgroundColor3 = Theme.Background
-MInput.TextColor3 = Theme.Text
-MInput.Font = Enum.Font.Gotham
-MInput.TextSize = 12
-MInput.PlaceholderText = "Enter Amount..."
-MInput.Text = ""
-Instance.new("UICorner", MInput).CornerRadius = UDim.new(0, 6)
+MInput.Size = UDim2.new(0.4, 0, 0, 30); MInput.Position = UDim2.new(0.45, 0, 0.5, -15)
+MInput.BackgroundColor3 = Theme.Background; MInput.TextColor3 = Theme.Text; MInput.PlaceholderText = "Amount"
+Instance.new("UICorner", MInput)
 
-MInput:GetPropertyChangedSignal("Text"):Connect(function()
-    local clean = MInput.Text:gsub("[^0-9.]", "")
-    if clean ~= "" and not MInput.Text:match(",$") then MInput.Text = FormatCommas(clean) end
-end)
+local MExec = Instance.new("TextButton", MoneyCard)
+MExec.Size = UDim2.new(0, 30, 0, 30); MExec.Position = UDim2.new(1, -40, 0.5, -15)
+MExec.BackgroundColor3 = Theme.AccentStart; MExec.Text = ">"; MExec.TextColor3 = Theme.Text
+Instance.new("UICorner", MExec)
 
-local MBtn = Instance.new("TextButton", MoneyCard)
-MBtn.Size = UDim2.new(0, 35, 0, 35)
-MBtn.Position = UDim2.new(0.95, -35, 0, 50)
-MBtn.BackgroundColor3 = Theme.AccentEnd
-MBtn.Text = "▶"
-MBtn.TextColor3 = Theme.Text
-Instance.new("UICorner", MBtn).CornerRadius = UDim.new(0, 6)
-
-MBtn.MouseButton1Click:Connect(function()
-    local rawText = CleanNumber(MInput.Text)
-    local rawAmount = tonumber(rawText)
-    if not rawAmount then 
-        MBtn.Text = "!"
-        wait(1)
-        MBtn.Text = "▶"
-        return 
+MExec.MouseButton1Click:Connect(function()
+    local amt = tonumber(CleanNumber(MInput.Text))
+    if amt then
+        ReplicatedStorage.Events.buy:InvokeServer(Config.ItemName, -(amt / Config.ItemPrice), Config.ItemType)
     end
-    
-    local calc = -(rawAmount / Config.ItemPrice)
-    ReplicatedStorage.Events.buy:InvokeServer(Config.ItemName, calc, Config.ItemType)
-    
-    -- Visual Feedback (No Text Clear)
-    MBtn.Text = "✓"
-    wait(1)
-    MBtn.Text = "▶"
 end)
 
--- HOME PAGE: Diamond Dice
-local DiceCard = CreateCard(PageHome, "Diamond Dice", "Acquire diamond dice automatically.")
-CreateToggle(DiceCard, "AutoDiamondDice", function(state)
+CreateToggle(CreateCard(PageHome, "Auto Diamond Dice"), "AutoDiamondDice", function(state)
     if state then
         for i = 1, Config.DiamondThreads do
             task.spawn(function()
@@ -467,86 +278,70 @@ CreateToggle(DiceCard, "AutoDiamondDice", function(state)
     end
 end)
 
-
--- AUTOMATION PAGE
-local EggCard = CreateCard(PageAuto, "Loop Purchase Best Egg", "Continuously buy the best egg.")
-CreateToggle(EggCard, "AutoInfEgg")
-
-local RollCard = CreateCard(PageAuto, "Fast Roll", "Rolls fast in the background.")
-CreateToggle(RollCard, "AutoRoll", function(state)
+CreateToggle(CreateCard(PageAuto, "Loop Buy Best Egg"), "AutoInfEgg")
+CreateToggle(CreateCard(PageAuto, "Super Fast Roll"), "AutoRoll", function(state)
     if state then
         for i = 1, Config.RollThreads do
             task.spawn(function()
                 while Config.AutoRoll do
                     pcall(function() LocalPlayer.PlayerGui.Main.Dice.RollState:InvokeServer() end)
+                    task.wait()
                 end
             end)
         end
     end
 end)
+CreateToggle(CreateCard(PageAuto, "Auto Place Best"), "AutoPlaceBest")
+CreateToggle(CreateCard(PageAuto, "Auto Sell All"), "AutoSell")
 
-local PlaceCard = CreateCard(PageAuto, "Place Best", "Automatically places best baddies.")
-CreateToggle(PlaceCard, "AutoPlaceBest")
+-- // LOGIC LOOPS //
 
-local SellCard = CreateCard(PageAuto, "Auto Sell", "Automatically sells inventory.")
-CreateToggle(SellCard, "AutoSell")
-
--- // INITIALIZE //
-
--- Transition from Loading to Main
-task.delay(1.6, function()
-    Tween(LoadingBackdrop, {BackgroundTransparency = 1}, TweenInfo.new(0.5))
-    Tween(LoaderFrame, {Size = UDim2.fromOffset(0,0), BackgroundTransparency = 1}, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In))
-    wait(0.5)
-    LoadingBackdrop:Destroy()
-    Main.Visible = true
-    
-    -- Pop in animation for Main
-    Main.Size = UDim2.fromOffset(500, 300)
-    Tween(Main, {Size = UDim2.fromOffset(550, 350)}, TweenInfo.new(0.6, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out))
-end)
-
--- // LOGIC LOOPS (SMART SYNC) //
-
--- 1. Auto Place Best (Standalone Loop)
 task.spawn(function()
     while true do
         if Config.AutoPlaceBest then
-            ReplicatedStorage.Events.PlaceBestBaddies:InvokeServer()
-            LastPlaceTime = tick() -- Update sync timestamp
+            pcall(function() ReplicatedStorage.Events.PlaceBestBaddies:InvokeServer() end)
+            LastPlaceTime = tick()
         end
-        task.wait(1)
+        task.wait(2)
     end
 end)
 
--- 2. Auto Sell (Standalone Loop with Sync Check)
 task.spawn(function()
     while true do
         if Config.AutoSell then
-            -- SMART SYNC: If AutoPlaceBest is ON, wait for safety buffer
-            if Config.AutoPlaceBest then
-                local timeSincePlace = tick() - LastPlaceTime
-                if timeSincePlace < 2 then
-                    -- Safety buffer: Wait until 2 seconds have passed since last equip
-                    task.wait(2 - timeSincePlace)
-                end
+            if not Config.AutoPlaceBest or (tick() - LastPlaceTime > 2.5) then
+                pcall(function() ReplicatedStorage.Events.sell:InvokeServer("all") end)
             end
-            
-            ReplicatedStorage.Events.sell:InvokeServer("all")
         end
         task.wait(5)
     end
 end)
 
--- 3. FAST INF EGG LOGIC
 task.spawn(function()
     while true do
         if Config.AutoInfEgg then
-            local Target = 100000000000000 -- 100T
-            local Calc = -(Target / Config.ItemPrice)
-            ReplicatedStorage.Events.buy:InvokeServer(Config.ItemName, Calc, Config.ItemType)
+            ReplicatedStorage.Events.buy:InvokeServer(Config.ItemName, -(1e14 / Config.ItemPrice), Config.ItemType)
             pcall(function() ReplicatedStorage.Events.RegularPet:InvokeServer(Config.EggName, Config.EggAmount) end)
             task.wait(0.1)
         else task.wait(1) end
     end
 end)
+
+-- Minimize Logic
+local MinBtn = Instance.new("TextButton", Main)
+MinBtn.Size = UDim2.fromOffset(30, 30); MinBtn.Position = UDim2.new(1, -35, 0, 5)
+MinBtn.BackgroundTransparency = 1; MinBtn.Text = "_"; MinBtn.TextColor3 = Theme.TextDim; MinBtn.TextSize = 20
+
+MinBtn.MouseButton1Click:Connect(function() Main.Visible = false; MiniWidget.Visible = true end)
+MiniWidget.MouseButton1Click:Connect(function() MiniWidget.Visible = false; Main.Visible = true end)
+
+-- Initial State
+PageHome.Visible = true
+Main.Position = UDim2.new(0.5, 0, 1.5, 0)
+Tween(Main, {Position = UDim2.fromScale(0.5, 0.5)})
+
+-- Draggable Main
+local d, i, s, p
+Main.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then d = true; s = input.Position; p = Main.Position end end)
+Main.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then d = false end end)
+UserInputService.InputChanged:Connect(function(input) if d and input.UserInputType == Enum.UserInputType.MouseMovement then local delta = input.Position - s; Main.Position = UDim2.new(p.X.Scale, p.X.Offset + delta.X, p.Y.Scale, p.Y.Offset + delta.Y) end end)
